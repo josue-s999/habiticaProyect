@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Habitica - Tu Coach de Hábitos Gamificado
 
 Habitica es una aplicación web diseñada para ayudarte a construir y mantener hábitos positivos de una manera divertida y motivadora. La aplicación utiliza la gamificación, asignando rangos a medida que completas retos en diversas categorías, y cuenta con un coach de IA personalizado para guiarte en tu viaje.
@@ -117,7 +116,3 @@ Para facilitar la presentación y el desarrollo, la página de aterrizaje se ha 
     -   **Descripción:** Se encarga de la llamada a la acción final para animar al registro e invitar a la comunidad de WhatsApp.
 
 Con esto, tienes una visión completa de la arquitectura y funcionalidades del proyecto Habitica.
-=======
-# Ctrl-Alt-ing-s
-zzz
->>>>>>> f032a8b02f7eba0ef45ff2c07855283f31ba712d
