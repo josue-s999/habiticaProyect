@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, User, Menu as MenuIcon, Settings, Trophy, BarChart, Users } from 'lucide-react';
+import { Home, User, Menu as MenuIcon, Settings, Trophy, BarChart, Users, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { SidebarHeader, SidebarNavContent } from './Sidebar';
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/ranks', label: 'Rangos', icon: Trophy },
   { href: '/leaderboard', label: 'Ranking', icon: Users },
   { href: '/reports', label: 'Reportes', icon: BarChart },
+  { href: '/mockups', label: 'Mockups', icon: Image },
 ];
 
 export function BottomNavbar() {
@@ -21,7 +22,7 @@ export function BottomNavbar() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
       <div className="container mx-auto grid h-16 max-w-lg grid-cols-5 items-center px-4">
-        {navItems.map((item) => {
+        {navItems.slice(0, 4).map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
             <Link

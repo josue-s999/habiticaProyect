@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
-import { Home, LogOut, MessageCircle, Trophy, Settings, BarChart, Users } from 'lucide-react';
+import { Home, LogOut, MessageCircle, Trophy, Settings, BarChart, Users, Image } from 'lucide-react';
 import { useMemo } from 'react';
 import { RANKS } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
@@ -33,6 +33,7 @@ const navItems = [
     { href: '/ranks', label: 'Rangos', icon: Trophy },
     { href: '/leaderboard', label: 'Ranking', icon: Users },
     { href: '/reports', label: 'Reportes', icon: BarChart },
+    { href: '/mockups', label: 'Mockups', icon: Image },
     { href: '/settings', label: 'Configuración', icon: Settings },
 ];
 
