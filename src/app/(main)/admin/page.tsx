@@ -37,11 +37,12 @@ export default function AdminPage() {
     if (!authLoading) {
       if (!user) {
         router.push('/login');
-      } else if (!isUserAdmin) {
+      } else if (userDoc && !isUserAdmin) {
         router.push('/home'); // Redirect non-admins
-      } else {
+      } else if(userDoc && isUserAdmin) {
         // Fetch admin data
         const fetchAllUsers = async () => {
+          setLoading(true);
           try {
             const users = await getAllUsers();
             setAllUsers(users);
@@ -55,7 +56,7 @@ export default function AdminPage() {
         fetchAllUsers();
       }
     }
-  }, [authLoading, user, isUserAdmin, router, toast]);
+  }, [authLoading, user, isUserAdmin, userDoc, router, toast]);
 
   const handleRoleChange = async (uid: string, newRole: 'user' | 'admin') => {
     try {
@@ -80,9 +81,15 @@ export default function AdminPage() {
       return allUsers.reduce((acc, user) => acc + (user.habits?.length || 0), 0);
   }, [allUsers]);
 
-  if (authLoading || loading || !isUserAdmin) {
+  if (authLoading || loading) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
+  
+  if (!isUserAdmin) {
+    // This is a fallback for the brief moment before redirection
+     return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  }
+
 
   return (
     <div className="space-y-8">
@@ -136,43 +143,44 @@ export default function AdminPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead>Usuario</TableHead>
-                        <TableHead>Correo</TableHead>
-                        <TableHead>Retos Activos</TableHead>
-                        <TableHead>Rol</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredUsers.map((u) => (
-                        <TableRow key={u.uid}>
-                            <TableCell className="font-medium">{u.displayName}</TableCell>
-                            <TableCell>{u.email}</TableCell>
-                            <TableCell>{u.habits?.length || 0}</TableCell>
-                            <TableCell>
-                                <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>{u.role}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Select onValueChange={(newRole: 'user' | 'admin') => handleRoleChange(u.uid, newRole)} defaultValue={u.role}>
-                                    <SelectTrigger className="w-[120px]">
-                                        <SelectValue placeholder="Cambiar rol" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="user">Usuario</SelectItem>
-                                        <SelectItem value="admin">Admin</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </TableCell>
-                        </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Usuario</TableHead>
+                            <TableHead>Correo</TableHead>
+                            <TableHead>Retos Activos</TableHead>
+                            <TableHead>Rol</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredUsers.map((u) => (
+                            <TableRow key={u.uid}>
+                                <TableCell className="font-medium">{u.displayName}</TableCell>
+                                <TableCell>{u.email}</TableCell>
+                                <TableCell>{u.habits?.length || 0}</TableCell>
+                                <TableCell>
+                                    <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>{u.role}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Select onValueChange={(newRole: 'user' | 'admin') => handleRoleChange(u.uid, newRole)} defaultValue={u.role}>
+                                        <SelectTrigger className="w-[120px]">
+                                            <SelectValue placeholder="Cambiar rol" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="user">Usuario</SelectItem>
+                                            <SelectItem value="admin">Admin</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
        </Card>
     </div>
   );
 }
-
