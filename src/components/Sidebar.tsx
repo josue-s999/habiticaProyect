@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
-import { Home, LogOut, MessageCircle, Trophy, Settings, BarChart, Users, Image } from 'lucide-react';
+import { Home, LogOut, MessageCircle, Trophy, Settings, BarChart, Users, Image, ShieldCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { RANKS } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
@@ -34,13 +34,21 @@ const navItems = [
     { href: '/leaderboard', label: 'Ranking', icon: Users },
     { href: '/reports', label: 'Reportes', icon: BarChart },
     { href: '/mockups', label: 'Mockups', icon: Image },
-    { href: '/settings', label: 'Configuración', icon: Settings },
 ];
+
+const adminNavItems = [
+    { href: '/admin', label: 'Admin', icon: ShieldCheck },
+]
+
+const bottomNavItems = [
+    { href: '/settings', label: 'Configuración', icon: Settings },
+]
 
 export function SidebarNavContent() {
   const pathname = usePathname();
   const { user, signOut, userDoc } = useAuth();
   const displayName = userDoc?.data()?.displayName || user?.displayName || 'Usuario';
+  const isUserAdmin = userDoc?.data()?.role === 'admin';
   
   const userHabits: Habit[] = useMemo(() => {
     if (!userDoc?.exists()) return [];
@@ -86,6 +94,25 @@ export function SidebarNavContent() {
                 </Button>
              </a>
         </nav>
+
+        {isUserAdmin && (
+             <div className="px-4">
+                <h3 className="mb-2 px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+                    Admin
+                </h3>
+                <nav className="flex flex-col gap-2">
+                    {adminNavItems.map((item) => (
+                        <Link key={item.href} href={item.href}>
+                            <Button variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'} className="w-full justify-start">
+                                <item.icon className="size-4 mr-2" />
+                                <span>{item.label}</span>
+                            </Button>
+                        </Link>
+                    ))}
+                </nav>
+             </div>
+        )}
+
         <div className="mt-auto flex flex-col gap-2 border-t p-4">
             {user && (
                 <>
@@ -99,6 +126,15 @@ export function SidebarNavContent() {
                             <span className="text-xs text-muted-foreground">{currentRank.name}</span>
                         </div>
                     </div>
+
+                    {bottomNavItems.map((item) => (
+                        <Link key={item.href} href={item.href}>
+                            <Button variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'} className="w-full justify-start">
+                                <item.icon className="size-4 mr-2" />
+                                <span>{item.label}</span>
+                            </Button>
+                        </Link>
+                    ))}
 
                      <Button variant="ghost" size="sm" onClick={signOut} className="justify-start">
                         <LogOut className="mr-2 h-4 w-4" />

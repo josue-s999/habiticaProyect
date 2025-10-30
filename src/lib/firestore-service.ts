@@ -1,9 +1,10 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit } from 'firebase/firestore';
-import type { PublicProfile } from '@/lib/types';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit, updateDoc } from 'firebase/firestore';
+import type { PublicProfile, FirestoreUser } from '@/lib/types';
 
 const PUBLIC_PROFILES_COLLECTION = 'publicProfiles';
+const USERS_COLLECTION = 'users';
 
 /**
  * Creates or updates a user's public profile document.
@@ -38,4 +39,23 @@ export async function getLeaderboardUsers(): Promise<PublicProfile[]> {
   
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => doc.data() as PublicProfile);
+}
+
+/**
+ * [ADMIN] Fetches all users from the users collection.
+ * @returns A promise that resolves to an array of all users.
+ */
+export async function getAllUsers(): Promise<FirestoreUser[]> {
+    const querySnapshot = await getDocs(collection(db, USERS_COLLECTION));
+    return querySnapshot.docs.map(doc => doc.data() as FirestoreUser);
+}
+
+/**
+ * [ADMIN] Updates the role of a specific user.
+ * @param uid The UID of the user to update.
+ * @param newRole The new role to assign ('user' or 'admin').
+ */
+export async function updateUserRole(uid: string, newRole: 'user' | 'admin'): Promise<void> {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    await updateDoc(userRef, { role: newRole });
 }
