@@ -86,9 +86,10 @@ export default function AdminPage() {
         await deleteHabitForUser(selectedUser.uid, habitId);
         
         // Update local state to reflect deletion
+        const updatedUserHabits = selectedUser.habits.filter(h => h.id !== habitId);
         const updatedUser = {
             ...selectedUser,
-            habits: selectedUser.habits.filter(h => h.id !== habitId)
+            habits: updatedUserHabits
         };
         setSelectedUser(updatedUser);
         setAllUsers(prevUsers => prevUsers.map(u => u.uid === selectedUser.uid ? updatedUser : u));
