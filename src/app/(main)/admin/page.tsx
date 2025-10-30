@@ -4,15 +4,15 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { getAllUsers, updateUserRole } from '@/lib/firestore-service';
-import { FirestoreUser } from '@/lib/types';
+import { getAllUsers, updateUserRole, deleteHabitForUser } from '@/lib/firestore-service';
+import { FirestoreUser, FirestoreHabit } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, ShieldCheck, BarChart4 } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, BarChart4, Trash2, Eye } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -21,6 +21,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AdminPage() {
   const { user, userDoc, loading: authLoading } = useAuth();
@@ -30,6 +33,8 @@ export default function AdminPage() {
   const [allUsers, setAllUsers] = useState<FirestoreUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<FirestoreUser | null>(null);
+  const [isHabitDialogOpen, setIsHabitDialogOpen] = useState(false);
   
   const isUserAdmin = useMemo(() => userDoc?.data()?.role === 'admin', [userDoc]);
 
@@ -66,6 +71,32 @@ export default function AdminPage() {
     } catch (error) {
       console.error("Error updating role:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el rol.' });
+    }
+  };
+
+  const handleOpenUserHabits = (user: FirestoreUser) => {
+    setSelectedUser(user);
+    setIsHabitDialogOpen(true);
+  };
+
+  const handleDeleteHabit = async (habitId: string) => {
+    if (!selectedUser) return;
+    
+    try {
+        await deleteHabitForUser(selectedUser.uid, habitId);
+        
+        // Update local state to reflect deletion
+        const updatedUser = {
+            ...selectedUser,
+            habits: selectedUser.habits.filter(h => h.id !== habitId)
+        };
+        setSelectedUser(updatedUser);
+        setAllUsers(prevUsers => prevUsers.map(u => u.uid === selectedUser.uid ? updatedUser : u));
+
+        toast({ title: 'Éxito', description: 'El reto ha sido eliminado.' });
+    } catch (error) {
+        console.error("Error deleting habit:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el reto.' });
     }
   };
 
@@ -163,7 +194,11 @@ export default function AdminPage() {
                                 <TableCell>
                                     <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>{u.role}</Badge>
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right flex items-center justify-end gap-2">
+                                     <Button variant="outline" size="sm" onClick={() => handleOpenUserHabits(u)}>
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        Ver Retos
+                                    </Button>
                                     <Select onValueChange={(newRole: 'user' | 'admin') => handleRoleChange(u.uid, newRole)} defaultValue={u.role}>
                                         <SelectTrigger className="w-[120px]">
                                             <SelectValue placeholder="Cambiar rol" />
@@ -181,6 +216,61 @@ export default function AdminPage() {
                 </div>
             </CardContent>
        </Card>
+
+        {selectedUser && (
+            <Dialog open={isHabitDialogOpen} onOpenChange={setIsHabitDialogOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Retos de {selectedUser.displayName}</DialogTitle>
+                        <DialogDescription>
+                            Aquí puedes ver y gestionar los retos del usuario.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="my-4">
+                        <ScrollArea className="h-72">
+                            <div className="space-y-4 pr-6">
+                                {selectedUser.habits && selectedUser.habits.length > 0 ? (
+                                    selectedUser.habits.map((habit: FirestoreHabit) => (
+                                        <div key={habit.id} className="flex items-center justify-between p-3 rounded-lg border">
+                                            <div>
+                                                <p className="font-semibold">{habit.name}</p>
+                                                <p className="text-sm text-muted-foreground">{habit.category} - {habit.duration} días</p>
+                                            </div>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="icon">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Esta acción no se puede deshacer. Se eliminará el reto "{habit.name}" para este usuario.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteHabit(habit.id)}>
+                                                            Eliminar
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-center text-muted-foreground py-10">Este usuario no tiene retos activos.</p>
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsHabitDialogOpen(false)}>Cerrar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        )}
     </div>
   );
 }

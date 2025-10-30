@@ -1,7 +1,7 @@
 
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit, updateDoc } from 'firebase/firestore';
-import type { PublicProfile, FirestoreUser } from '@/lib/types';
+import type { PublicProfile, FirestoreUser, FirestoreHabit } from '@/lib/types';
 
 const PUBLIC_PROFILES_COLLECTION = 'publicProfiles';
 const USERS_COLLECTION = 'users';
@@ -58,4 +58,20 @@ export async function getAllUsers(): Promise<FirestoreUser[]> {
 export async function updateUserRole(uid: string, newRole: 'user' | 'admin'): Promise<void> {
     const userRef = doc(db, USERS_COLLECTION, uid);
     await updateDoc(userRef, { role: newRole });
+}
+
+/**
+ * [ADMIN] Deletes a specific habit for a given user.
+ * @param uid The UID of the user whose habit is to be deleted.
+ * @param habitId The ID of the habit to delete.
+ */
+export async function deleteHabitForUser(uid: string, habitId: string): Promise<void> {
+    const userRef = doc(db, USERS_COLLECTION, uid);
+    const userDoc = (await getDocs(query(collection(db, USERS_COLLECTION)))).docs.find(d => d.id === uid);
+    if (!userDoc || !userDoc.exists()) {
+        throw new Error("User not found");
+    }
+    const userData = userDoc.data() as FirestoreUser;
+    const updatedHabits = userData.habits.filter((habit: FirestoreHabit) => habit.id !== habitId);
+    await updateDoc(userRef, { habits: updatedHabits });
 }
