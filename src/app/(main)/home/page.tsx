@@ -34,8 +34,15 @@ export default function HomePage() {
   const userRef = useMemo(() => user ? doc(db, "users", user.uid) : null, [user]);
 
   const loadUserData = useCallback(async () => {
-    if (!userRef) return;
-    if (userDoc?.exists()) {
+    if (!userDoc) {
+        // This is a new user or data is not yet loaded.
+        // Initialize with empty habits to allow adding new ones.
+        setHabits([]);
+        setIsDataLoaded(true);
+        return;
+    }
+
+    if (userDoc.exists()) {
         try {
             const userData = userDoc.data();
             const loadedHabits = (userData.habits || []).map((habit: FirestoreHabit) => ({
@@ -46,39 +53,42 @@ export default function HomePage() {
             setHabits(loadedHabits);
         } catch (error) {
             console.error("Error processing user data:", error);
+            setHabits([]); // Fallback to an empty array on error
         }
+    } else {
+        // Document doesn't exist, so habits list is empty
+        setHabits([]);
     }
     setIsDataLoaded(true);
-}, [userRef, userDoc]);
+}, [userDoc]);
   
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
-    } else if (user && userDoc && !isDataLoaded) {
+    } else if (user && !isDataLoaded) { // Simplified condition
       loadUserData();
-    } else if (!userDoc && !authLoading) {
-      setIsDataLoaded(true); // Handle case for new users with no doc yet
+    } else if (!user && !authLoading) {
+      setIsDataLoaded(true); // Handle case for logged out users
     }
-  }, [user, userDoc, authLoading, router, isDataLoaded, loadUserData]);
+  }, [user, authLoading, router, isDataLoaded, loadUserData]);
 
 
   const saveData = useCallback(async (updatedHabits: Habit[], xpGained = 0) => {
-    if (!userRef || !userDoc) return;
+    if (!userRef) return; // Don't need userDoc check here
     try {
-      const dataToSave: { habits: FirestoreHabit[] } = {
+      const dataToSave: { habits: FirestoreHabit[], xp?: number } = {
         habits: updatedHabits.map(({ icon, ...rest }) => rest),
       };
-
+      
+      const currentXp = userDoc?.data()?.xp || 0;
       if (xpGained > 0) {
-        const currentXp = userDoc.data()?.xp || 0;
-        await updateDoc(userRef, {
-            ...dataToSave,
-            xp: currentXp + xpGained
-        });
-      } else {
-        // Use setDoc with merge to avoid overwriting other user fields
-        await setDoc(userRef, dataToSave, { merge: true });
+        dataToSave.xp = currentXp + xpGained;
       }
+
+      // Use setDoc with merge: true. This will create the doc if it doesn't exist,
+      // and merge the data if it does. It's safer than switching between update/set.
+      await setDoc(userRef, dataToSave, { merge: true });
+
     } catch (error) {
       console.error("Error saving data:", error);
       toast({
