@@ -29,8 +29,8 @@ export function BottomNavbar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 w-full text-sm font-medium transition-colors h-full',
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-primary'
+                'flex flex-col items-center justify-center gap-1 w-full text-sm font-medium transition-colors h-full rounded-md',
+                isActive ? 'text-primary bg-primary/15' : 'text-muted-foreground hover:text-primary'
               )}
             >
               <item.icon className="h-6 w-6" />

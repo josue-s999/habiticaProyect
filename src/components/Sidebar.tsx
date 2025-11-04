@@ -13,6 +13,7 @@ import { Logo } from './icons';
 import { SheetHeader, SheetTitle } from './ui/sheet';
 import { Habit, FirestoreHabit } from '@/lib/types';
 import { calculateCompletedHabitsByCategory, getIconForHabit } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 
 export function SidebarHeader() {
@@ -79,14 +80,17 @@ export function SidebarNavContent() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
         <nav className="flex flex-col gap-2 p-4">
-            {navItems.map((item) => (
-                 <Link key={item.href} href={item.href}>
-                    <Button variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'} className="w-full justify-start">
-                        <item.icon className="size-4 mr-2" />
-                        <span>{item.label}</span>
-                    </Button>
-                 </Link>
-            ))}
+            {navItems.map((item) => {
+                 const isActive = pathname.startsWith(item.href);
+                 return (
+                     <Link key={item.href} href={item.href}>
+                        <Button variant={isActive ? 'secondary' : 'ghost'} className={cn("w-full justify-start", { "bg-primary/15 text-primary hover:bg-primary/20": isActive })}>
+                            <item.icon className="size-4 mr-2" />
+                            <span>{item.label}</span>
+                        </Button>
+                     </Link>
+                 );
+            })}
              <a href="https://chat.whatsapp.com/BHhcW7kOWKxApJOyu9nyNm" target="_blank" rel="noopener noreferrer">
                 <Button variant="ghost" className="w-full justify-start">
                     <MessageCircle className="size-4 mr-2" />
@@ -101,14 +105,17 @@ export function SidebarNavContent() {
                     Admin
                 </h3>
                 <nav className="flex flex-col gap-2">
-                    {adminNavItems.map((item) => (
-                        <Link key={item.href} href={item.href}>
-                            <Button variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'} className="w-full justify-start">
-                                <item.icon className="size-4 mr-2" />
-                                <span>{item.label}</span>
-                            </Button>
-                        </Link>
-                    ))}
+                    {adminNavItems.map((item) => {
+                         const isActive = pathname.startsWith(item.href);
+                         return (
+                            <Link key={item.href} href={item.href}>
+                                <Button variant={isActive ? 'secondary' : 'ghost'} className={cn("w-full justify-start", { "bg-primary/15 text-primary hover:bg-primary/20": isActive })}>
+                                    <item.icon className="size-4 mr-2" />
+                                    <span>{item.label}</span>
+                                </Button>
+                            </Link>
+                         );
+                    })}
                 </nav>
              </div>
         )}
@@ -127,14 +134,17 @@ export function SidebarNavContent() {
                         </div>
                     </div>
 
-                    {bottomNavItems.map((item) => (
-                        <Link key={item.href} href={item.href}>
-                            <Button variant={pathname.startsWith(item.href) ? 'secondary' : 'ghost'} className="w-full justify-start">
-                                <item.icon className="size-4 mr-2" />
-                                <span>{item.label}</span>
-                            </Button>
-                        </Link>
-                    ))}
+                    {bottomNavItems.map((item) => {
+                        const isActive = pathname.startsWith(item.href);
+                        return (
+                            <Link key={item.href} href={item.href}>
+                                <Button variant={isActive ? 'secondary' : 'ghost'} className={cn("w-full justify-start", { "bg-primary/15 text-primary hover:bg-primary/20": isActive })}>
+                                    <item.icon className="size-4 mr-2" />
+                                    <span>{item.label}</span>
+                                </Button>
+                            </Link>
+                        );
+                    })}
 
                      <Button variant="ghost" size="sm" onClick={signOut} className="justify-start">
                         <LogOut className="mr-2 h-4 w-4" />
