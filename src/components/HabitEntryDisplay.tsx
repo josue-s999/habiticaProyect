@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, Circle, Star } from 'lucide-react';
+import { ChevronDown, Circle, Star, CheckCircle } from 'lucide-react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { HabitEntry } from '@/lib/types';
@@ -26,40 +26,50 @@ export function HabitEntryDisplay({ entry, index, habitId, mainDayEntries, onUpd
   };
 
   const handleSaveAndClose = () => {
-    onUpdateEntry(habitId, entry.date, { journal: journalText, completed: true });
+    onUpdateEntry(habitId, entry.date, { journal: journalText });
     setIsOpen(false);
   };
+  
+  const handleMarkComplete = () => {
+    onUpdateEntry(habitId, entry.date, { completed: !entry.completed });
+  }
 
   const mainDayEntryIndex = mainDayEntries.findIndex(e => isSameDay(parseISO(e.date), parseISO(entry.date)));
   const dayNumber = mainDayEntries.length - mainDayEntryIndex;
+  
+  const Icon = entry.completed ? CheckCircle : Circle;
 
   return (
-    <div className="p-3 rounded-md bg-muted/50">
+    <div className="p-3 rounded-lg bg-muted/60 transition-colors">
       <div 
-        className="flex items-center justify-between cursor-pointer" 
-        onClick={handleToggleOpen}
+        className="flex items-center justify-between"
       >
-        <div className="flex items-center gap-2">
-            <div className="font-semibold flex items-center gap-2">
-                {entry.isExtra ? (
-                    <>
-                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500"/>
-                        <span>Avance Extra del Día {dayNumber}</span>
-                    </>
-                ) : (
-                    <>
-                        <Circle className={`h-3 w-3 ${entry.completed ? 'fill-green-500 text-green-500' : 'fill-muted-foreground text-muted-foreground'}`}/>
+        <div className="flex items-center gap-3">
+             <Icon 
+                className={`h-6 w-6 cursor-pointer transition-colors ${entry.completed ? 'text-secondary fill-green-100' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={handleMarkComplete}
+            />
+            <div onClick={handleToggleOpen} className="cursor-pointer">
+                <div className="font-semibold flex items-center gap-2">
+                    {entry.isExtra ? (
+                        <>
+                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-400"/>
+                            <span>Avance Extra del Día {dayNumber}</span>
+                        </>
+                    ) : (
                         <span>Día {dayNumber}</span>
-                    </>
-                )}
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">{format(parseISO(entry.date), "d 'de' MMMM, yyyy", { locale: es })}</p>
             </div>
-            <p className="text-xs text-muted-foreground">{format(parseISO(entry.date), "d 'de' MMMM", { locale: es })}</p>
         </div>
-        <ChevronDown className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <Button variant="ghost" size="icon" onClick={handleToggleOpen}>
+            <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </Button>
       </div>
 
       {isOpen && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 ml-9 space-y-3">
           <Textarea
             placeholder="¿Qué aprendiste? ¿Cómo te sentiste?"
             value={journalText}
@@ -68,7 +78,7 @@ export function HabitEntryDisplay({ entry, index, habitId, mainDayEntries, onUpd
             rows={3}
           />
           <Button size="sm" onClick={handleSaveAndClose}>
-            Guardar y Cerrar
+            Guardar Diario
           </Button>
         </div>
       )}

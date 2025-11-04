@@ -1,4 +1,3 @@
-
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -17,11 +16,6 @@ export default {
       },
     },
     extend: {
-      fontFamily: {
-        body: ['PT Sans', 'sans-serif'],
-        headline: ['PT Sans', 'sans-serif'],
-        code: ['monospace'],
-      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -55,14 +49,6 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-          border: "hsl(var(--border))",
-          accent: "hsl(var(--accent))",
-          "accent-foreground": "hsl(var(--accent-foreground))",
-          ring: "hsl(var(--ring))",
         },
       },
       borderRadius: {
