@@ -1,7 +1,8 @@
 
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
 import type { PublicProfile, FirestoreUser, FirestoreHabit } from '@/lib/types';
+import { RANKS } from './constants';
 
 const PUBLIC_PROFILES_COLLECTION = 'publicProfiles';
 const USERS_COLLECTION = 'users';
@@ -77,3 +78,41 @@ export async function deleteHabitForUser(uid: string, habitId: string): Promise<
     const updatedHabits = userData.habits.filter((habit: FirestoreHabit) => habit.id !== habitId);
     await updateDoc(userRef, { habits: updatedHabits });
 }
+
+/**
+ * [ADMIN] Seeds the leaderboard with 100 fake users.
+ */
+export async function seedLeaderboardData(): Promise<void> {
+  const batch = writeBatch(db);
+  const names = ['Alex', 'Jordan', 'Taylor', 'Casey', 'Riley', 'Jamie', 'Morgan', 'Skyler', 'Peyton', 'Quinn'];
+
+  for (let i = 0; i < 100; i++) {
+    const randomName = names[Math.floor(Math.random() * names.length)];
+    const completedHabits = Math.floor(Math.random() * 50); // Random habits from 0 to 49
+    
+    // Determine rank based on completed habits
+    let rankName = RANKS[0].name;
+    for (const rank of RANKS) {
+      // A simplified logic to assign ranks based on habits
+      const totalRequirements = Object.values(rank.requirements).reduce((sum, val) => sum + val, 0);
+      if (completedHabits >= totalRequirements * 2) { // just a sample logic
+        rankName = rank.name;
+      }
+    }
+
+    const fakeUser: PublicProfile = {
+      uid: `fake-user-${Date.now()}-${i}`,
+      displayName: `${randomName} ${i + 1}`,
+      photoURL: `https://i.pravatar.cc/150?u=${i}`,
+      rankName: rankName,
+      completedHabits: completedHabits,
+    };
+    
+    const docRef = doc(db, PUBLIC_PROFILES_COLLECTION, fakeUser.uid);
+    batch.set(docRef, fakeUser);
+  }
+
+  await batch.commit();
+}
+
+    

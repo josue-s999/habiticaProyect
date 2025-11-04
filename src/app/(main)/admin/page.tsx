@@ -4,15 +4,15 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { getAllUsers, updateUserRole, deleteHabitForUser } from '@/lib/firestore-service';
-import { FirestoreUser, FirestoreHabit } from '@/lib/types';
+import { getAllUsers, updateUserRole, deleteHabitForUser, seedLeaderboardData } from '@/lib/firestore-service';
+import { FirestoreUser, FirestoreHabit, PublicProfile } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, ShieldCheck, BarChart4, Trash2, Eye } from 'lucide-react';
+import { Loader2, Users, ShieldCheck, BarChart4, Trash2, Eye, TestTube2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -32,6 +32,7 @@ export default function AdminPage() {
 
   const [allUsers, setAllUsers] = useState<FirestoreUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<FirestoreUser | null>(null);
   const [isHabitDialogOpen, setIsHabitDialogOpen] = useState(false);
@@ -101,6 +102,19 @@ export default function AdminPage() {
     }
   };
 
+  const handleSeedLeaderboard = async () => {
+    setSeeding(true);
+    try {
+      await seedLeaderboardData();
+      toast({ title: 'Éxito', description: 'Se han generado 100 usuarios ficticios en el ranking.' });
+    } catch (error) {
+      console.error("Error seeding leaderboard:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron generar los datos de prueba.' });
+    } finally {
+      setSeeding(false);
+    }
+  }
+
   const filteredUsers = useMemo(() => {
     if (!searchTerm) return allUsers;
     return allUsers.filter(u => 
@@ -162,6 +176,37 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Herramientas de Administrador</CardTitle>
+          </CardHeader>
+          <CardContent>
+              <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button disabled={seeding}>
+                      {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube2 className="mr-2 h-4 w-4" />}
+                       Poblar Ranking (Test)
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                      <AlertDialogHeader>
+                          <AlertDialogTitle>¿Poblar el ranking con datos de prueba?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                              Esta acción creará 100 usuarios ficticios en el ranking de la comunidad.
+                              Esto no afectará a los usuarios reales. Es útil para probar la funcionalidad del ranking.
+                          </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleSeedLeaderboard}>
+                              Sí, poblar datos
+                          </AlertDialogAction>
+                      </AlertDialogFooter>
+                  </AlertDialogContent>
+              </AlertDialog>
+          </CardContent>
+        </Card>
 
        <Card>
             <CardHeader>
@@ -275,3 +320,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    

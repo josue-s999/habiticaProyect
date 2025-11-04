@@ -83,3 +83,5 @@ export interface PublicProfile {
     rankName: string;
     completedHabits: number;
 }
+
+    
