@@ -14,8 +14,6 @@ export function HeroSection() {
         </h1>
         <p className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground">
           Usa la gamificación para construir hábitos duraderos. Gana XP, sube de nivel y alcanza tus metas con tu coach de IA. Empieza a construir la vida que deseas.
-          <br />
-          <em className="text-sm text-primary">Atte: Harry Gongora</em>
         </p>
         <div className="mt-8 flex justify-center gap-4">
           <Button asChild size="lg">
