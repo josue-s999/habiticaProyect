@@ -18,7 +18,8 @@ import { AddHabitDialog } from '@/components/AddHabitDialog';
 import { AIChatPanel } from '@/components/AIChatPanel';
 import { HabitProgress } from '@/components/HabitProgress';
 import { Loader2 } from 'lucide-react';
-import { getIconForHabit } from '@/lib/utils';
+import { getIconForHabit, checkAndUnlockAchievements } from '@/lib/utils';
+import { ACHIEVEMENTS } from '@/lib/achievements';
 
 
 export default function HomePage() {
@@ -35,9 +36,6 @@ export default function HomePage() {
 
   const loadUserData = useCallback(async () => {
     if (!userDoc) {
-        // This is a new user or data is not yet loaded.
-        // Initialize with empty habits to allow adding new ones.
-        setHabits([]);
         setIsDataLoaded(true);
         return;
     }
@@ -51,16 +49,34 @@ export default function HomePage() {
                 icon: getIconForHabit(habit.id),
             }));
             setHabits(loadedHabits);
+            
+            // Check for new achievements on load
+            const { newlyUnlocked } = checkAndUnlockAchievements(loadedHabits, chatHistory, userData.unlockedAchievements || []);
+            if (newlyUnlocked.length > 0) {
+                const updatedAchievements = [...(userData.unlockedAchievements || []), ...newlyUnlocked];
+                if(userRef) {
+                  await updateDoc(userRef, { unlockedAchievements: updatedAchievements });
+                }
+                newlyUnlocked.forEach(achievementId => {
+                    const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+                    if (achievement) {
+                        toast({
+                            title: "🏆 ¡Logro Desbloqueado!",
+                            description: achievement.name,
+                        });
+                    }
+                });
+            }
+
         } catch (error) {
             console.error("Error processing user data:", error);
-            setHabits([]); // Fallback to an empty array on error
+            setHabits([]);
         }
     } else {
-        // Document doesn't exist, so habits list is empty
         setHabits([]);
     }
     setIsDataLoaded(true);
-}, [userDoc]);
+}, [userDoc, userRef, chatHistory, toast]);
   
   useEffect(() => {
     if (!authLoading && !user) {
@@ -73,31 +89,47 @@ export default function HomePage() {
   }, [user, authLoading, router, isDataLoaded, loadUserData]);
 
 
-  const saveData = useCallback(async (updatedHabits: Habit[], xpGained = 0) => {
-    if (!userRef) return; // Don't need userDoc check here
+ const saveData = useCallback(async (updatedHabits: Habit[], updatedChatHistory: ChatMessage[], xpGained = 0) => {
+    if (!userRef || !userDoc) return;
     try {
-      const dataToSave: { habits: FirestoreHabit[], xp?: number } = {
-        habits: updatedHabits.map(({ icon, ...rest }) => rest),
-      };
-      
-      const currentXp = userDoc?.data()?.xp || 0;
-      if (xpGained > 0) {
-        dataToSave.xp = currentXp + xpGained;
-      }
+        const currentUserData = userDoc.data() || {};
+        const existingAchievements = currentUserData.unlockedAchievements || [];
 
-      // Use setDoc with merge: true. This will create the doc if it doesn't exist,
-      // and merge the data if it does. It's safer than switching between update/set.
-      await setDoc(userRef, dataToSave, { merge: true });
+        const { newlyUnlocked, allUnlocked } = checkAndUnlockAchievements(updatedHabits, updatedChatHistory, existingAchievements);
+
+        const dataToSave: any = {
+            habits: updatedHabits.map(({ icon, ...rest }) => rest),
+        };
+
+        const currentXp = currentUserData.xp || 0;
+        if (xpGained > 0) {
+            dataToSave.xp = currentXp + xpGained;
+        }
+
+        if (newlyUnlocked.length > 0) {
+            dataToSave.unlockedAchievements = allUnlocked;
+            newlyUnlocked.forEach(achievementId => {
+                const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+                if (achievement) {
+                    toast({
+                        title: "🏆 ¡Logro Desbloqueado!",
+                        description: achievement.name,
+                    });
+                }
+            });
+        }
+
+        await setDoc(userRef, dataToSave, { merge: true });
 
     } catch (error) {
-      console.error("Error saving data:", error);
-      toast({
-        variant: "destructive",
-        title: "Error de guardado",
-        description: "No se pudo guardar tu progreso.",
-      });
+        console.error("Error saving data:", error);
+        toast({
+            variant: "destructive",
+            title: "Error de guardado",
+            description: "No se pudo guardar tu progreso.",
+        });
     }
-  }, [userRef, userDoc, toast]);
+}, [userRef, userDoc, toast]);
 
 
   const handleUpdateEntry = (habitId: string, entryDate: string, newValues: Partial<HabitEntry>) => {
@@ -110,7 +142,6 @@ export default function HomePage() {
             const updatedEntries = h.entries.map(e => e.date === entryDate ? { ...e, ...newValues } : e);
             const newCompleted = updatedEntries.find(e => e.date === entryDate)?.completed;
 
-            // Grant XP only if it's a main entry being completed for the first time
             if (newCompleted && !oldCompleted && !oldEntry?.isExtra) {
                 xpChange = 1;
             }
@@ -120,7 +151,7 @@ export default function HomePage() {
     });
 
     setHabits(updatedHabits);
-    saveData(updatedHabits, xpChange);
+    saveData(updatedHabits, chatHistory, xpChange);
   };
   
   const handleAddNewEntry = (habitId: string) => {
@@ -134,11 +165,9 @@ export default function HomePage() {
 
         let newEntry: HabitEntry;
         if (!lastMainEntry || !isSameDay(parseISO(lastMainEntry.date), parseISO(todayStr))) {
-          // It's a new day, add a main entry
           newEntry = { date: todayStr, completed: false, journal: '', isExtra: false };
           toast({ title: `¡Nuevo día, nuevo reto!`, description: 'Has registrado tu avance para hoy.' });
         } else {
-          // It's the same day, add an extra entry
           newEntry = { date: todayStr, completed: false, journal: '', isExtra: true };
           toast({ title: '¡Imparable!', description: 'Has añadido una entrada extra para hoy.' });
         }
@@ -149,7 +178,7 @@ export default function HomePage() {
     });
   
     setHabits(updatedHabits);
-    saveData(updatedHabits); // Save the changes to Firestore
+    saveData(updatedHabits, chatHistory);
   };
 
   const handleAddHabit = (name: string, category: string, description: string, duration: number) => {
@@ -164,7 +193,7 @@ export default function HomePage() {
     };
     const updatedHabits = [...habits, newHabit];
     setHabits(updatedHabits);
-    saveData(updatedHabits);
+    saveData(updatedHabits, chatHistory);
     setNewlyAddedHabitId(newHabit.id);
     toast({
       title: "Reto añadido",
@@ -175,7 +204,7 @@ export default function HomePage() {
   const handleDeleteHabit = (habitId: string) => {
     const updatedHabits = habits.filter(habit => habit.id !== habitId);
     setHabits(updatedHabits);
-    saveData(updatedHabits);
+    saveData(updatedHabits, chatHistory);
     toast({
       title: "Reto eliminado",
       description: "El reto ha sido eliminado de tu lista.",
@@ -194,6 +223,9 @@ export default function HomePage() {
       const assistantMessage: ChatMessage = { role: 'assistant', content: result.answer, suggestions: result.suggestions };
       const finalHistory = [...newHistory, assistantMessage];
       setChatHistory(finalHistory);
+      
+      // Save data after chat to check for chat-related achievements
+      saveData(habits, finalHistory);
       
       return result;
     } catch (error) {

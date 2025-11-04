@@ -2,8 +2,9 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { subDays, format, isSameDay, parseISO } from 'date-fns';
-import type { Habit, HabitEntry } from './types';
+import type { Habit, HabitEntry, ChatMessage } from './types';
 import { BookOpen, Dumbbell, HeartPulse, TrendingUp } from 'lucide-react';
+import { ACHIEVEMENTS } from "./achievements";
 
 
 export function cn(...inputs: ClassValue[]) {
@@ -103,4 +104,26 @@ export function calculateCompletedHabitsByCategory(habits: Habit[]): { [category
   });
 
   return { ...counts, total };
+}
+
+export function checkAndUnlockAchievements(
+    habits: Habit[],
+    chatHistory: ChatMessage[],
+    existingAchievements: string[]
+): { newlyUnlocked: string[], allUnlocked: string[] } {
+  const newlyUnlocked: string[] = [];
+
+  ACHIEVEMENTS.forEach(achievement => {
+    // Check if it's already unlocked
+    if (!existingAchievements.includes(achievement.id)) {
+      // If not, check if the condition is met now
+      if (achievement.checker(habits, chatHistory)) {
+        newlyUnlocked.push(achievement.id);
+      }
+    }
+  });
+  
+  const allUnlocked = [...new Set([...existingAchievements, ...newlyUnlocked])];
+
+  return { newlyUnlocked, allUnlocked };
 }

@@ -33,6 +33,15 @@ export type Rank = {
   };
 };
 
+export type Achievement = {
+  id: string;
+  name: string;
+  description: string;
+  icon: LucideIcon;
+  isSecret?: boolean; // Secret achievements are hidden until unlocked
+  checker: (habits: Habit[], chatHistory?: ChatMessage[]) => boolean;
+};
+
 // Schema for AI chat suggestions for detailed habits/challenges
 export const HabitSuggestionSchema = z.object({
     name: z.string().describe('The name of the suggested habit challenge.'),
@@ -68,12 +77,13 @@ export interface FirestoreUser {
   uid: string;
   displayName: string;
   email: string | null;
-  theme: 'light' | 'blue' | 'pink';
+  theme: 'light' | 'dark';
   xp: number;
   habits: FirestoreHabit[];
   role: 'user' | 'admin';
   gender?: string;
   isPublic?: boolean;
+  unlockedAchievements?: string[];
 }
 
 export interface PublicProfile {
@@ -83,5 +93,3 @@ export interface PublicProfile {
     rankName: string;
     completedHabits: number;
 }
-
-    

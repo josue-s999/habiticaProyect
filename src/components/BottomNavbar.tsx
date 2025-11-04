@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, User, Menu as MenuIcon, Settings, Trophy, BarChart, Users, Image } from 'lucide-react';
+import { Home, User, Menu as MenuIcon, Settings, Trophy, BarChart, Users, Image, Shield, Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { SidebarHeader, SidebarNavContent } from './Sidebar';
@@ -11,6 +11,7 @@ import { SidebarHeader, SidebarNavContent } from './Sidebar';
 const navItems = [
   { href: '/home', label: 'Inicio', icon: Home },
   { href: '/ranks', label: 'Rangos', icon: Trophy },
+  { href: '/achievements', label: 'Logros', icon: Award },
   { href: '/leaderboard', label: 'Ranking', icon: Users },
   { href: '/reports', label: 'Reportes', icon: BarChart },
   { href: '/mockups', label: 'Mockups', icon: Image },

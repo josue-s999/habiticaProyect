@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
-import { Home, LogOut, MessageCircle, Trophy, Settings, BarChart, Users, Image, ShieldCheck } from 'lucide-react';
+import { Home, LogOut, MessageCircle, Trophy, Settings, BarChart, Users, Image, ShieldCheck, Award } from 'lucide-react';
 import { useMemo } from 'react';
 import { RANKS } from '@/lib/constants';
 import { useAuth } from '@/hooks/use-auth';
@@ -32,6 +32,7 @@ export function SidebarHeader() {
 const navItems = [
     { href: '/home', label: 'Inicio', icon: Home },
     { href: '/ranks', label: 'Rangos', icon: Trophy },
+    { href: '/achievements', label: 'Logros', icon: Award },
     { href: '/leaderboard', label: 'Ranking', icon: Users },
     { href: '/reports', label: 'Reportes', icon: BarChart },
     { href: '/mockups', label: 'Mockups', icon: Image },
