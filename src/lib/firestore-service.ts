@@ -1,8 +1,9 @@
 
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
-import type { PublicProfile, FirestoreUser, FirestoreHabit } from '@/lib/types';
+import type { PublicProfile, FirestoreUser, FirestoreHabit, HabitEntry } from '@/lib/types';
 import { RANKS } from './constants';
+import { addDays, format, subDays } from 'date-fns';
 
 const PUBLIC_PROFILES_COLLECTION = 'publicProfiles';
 const USERS_COLLECTION = 'users';
@@ -80,39 +81,132 @@ export async function deleteHabitForUser(uid: string, habitId: string): Promise<
 }
 
 /**
- * [ADMIN] Seeds the leaderboard with 100 fake users.
+ * [ADMIN] Generates a specified number of fake users and their public profiles for testing.
+ * @param count The number of fake users to create.
  */
-export async function seedLeaderboardData(): Promise<void> {
+export async function seedUsersAndProfiles(count: number = 100): Promise<void> {
   const batch = writeBatch(db);
   const names = ['Alex', 'Jordan', 'Taylor', 'Casey', 'Riley', 'Jamie', 'Morgan', 'Skyler', 'Peyton', 'Quinn'];
 
-  for (let i = 0; i < 100; i++) {
-    const randomName = names[Math.floor(Math.random() * names.length)];
-    const completedHabits = Math.floor(Math.random() * 50); // Random habits from 0 to 49
+  for (let i = 0; i < count; i++) {
+    const randomName = `${names[Math.floor(Math.random() * names.length)]} #${i + 1}`;
+    const uid = `fake-user-${Date.now()}-${i}`;
+    const completedHabitsCount = Math.floor(Math.random() * 25);
     
-    // Determine rank based on completed habits
+    // Determine rank
     let rankName = RANKS[0].name;
     for (const rank of RANKS) {
-      // A simplified logic to assign ranks based on habits
-      const totalRequirements = Object.values(rank.requirements).reduce((sum, val) => sum + val, 0);
-      if (completedHabits >= totalRequirements * 2) { // just a sample logic
+      const totalRequirements = Object.values(rank.requirements).reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0);
+      if (completedHabitsCount >= totalRequirements) {
         rankName = rank.name;
       }
     }
-
-    const fakeUser: PublicProfile = {
-      uid: `fake-user-${Date.now()}-${i}`,
-      displayName: `${randomName} ${i + 1}`,
-      photoURL: `https://i.pravatar.cc/150?u=${i}`,
-      rankName: rankName,
-      completedHabits: completedHabits,
-    };
     
-    const docRef = doc(db, PUBLIC_PROFILES_COLLECTION, fakeUser.uid);
-    batch.set(docRef, fakeUser);
+    // Create Firestore User
+    const fakeUser: FirestoreUser = {
+      uid,
+      displayName: randomName,
+      email: `${uid}@example.com`,
+      theme: 'light',
+      xp: 0,
+      habits: [], // Seeded users start with no habits for simplicity
+      role: 'user',
+      isPublic: true,
+      unlockedAchievements: [],
+    };
+    const userDocRef = doc(db, USERS_COLLECTION, uid);
+    batch.set(userDocRef, fakeUser);
+    
+    // Create Public Profile
+    const publicProfile: PublicProfile = {
+      uid,
+      displayName: randomName,
+      photoURL: `https://i.pravatar.cc/150?u=${uid}`,
+      rankName: rankName,
+      completedHabits: completedHabitsCount,
+    };
+    const publicProfileRef = doc(db, PUBLIC_PROFILES_COLLECTION, uid);
+    batch.set(publicProfileRef, publicProfile);
   }
 
   await batch.commit();
 }
 
-    
+
+/**
+ * [ADMIN] Creates a single fake user with specified test data.
+ */
+export async function createFakeUser({
+  name,
+  completedHabits,
+  hasActiveHabits,
+  streakDays,
+}: {
+  name: string;
+  completedHabits: number;
+  hasActiveHabits: boolean;
+  streakDays: number;
+}): Promise<void> {
+  const batch = writeBatch(db);
+  const uid = `fake-user-manual-${Date.now()}`;
+
+  // --- 1. Create Firestore User ---
+  const habits: FirestoreHabit[] = [];
+  if (hasActiveHabits) {
+    const entries: HabitEntry[] = [];
+    // Create a fake streak
+    if (streakDays > 0) {
+      for (let i = 0; i < streakDays; i++) {
+        entries.push({
+          date: format(subDays(new Date(), i), 'yyyy-MM-dd'),
+          completed: true,
+          journal: `Entrada del día de racha #${streakDays - i}`,
+          isExtra: false,
+        });
+      }
+    }
+    habits.push({
+      id: `habit-${uid}-1`,
+      name: 'Reto de Prueba (Racha)',
+      category: 'Crecimiento Personal',
+      description: 'Reto de prueba generado por admin.',
+      duration: 30,
+      entries: entries,
+    });
+  }
+
+  const fakeUser: FirestoreUser = {
+    uid,
+    displayName: name,
+    email: `${uid}@example.com`,
+    theme: 'light',
+    xp: 0,
+    habits: habits,
+    role: 'user',
+    isPublic: true,
+    unlockedAchievements: [],
+  };
+  const userDocRef = doc(db, USERS_COLLECTION, uid);
+  batch.set(userDocRef, fakeUser);
+
+  // --- 2. Create Public Profile ---
+  let rankName = RANKS[0].name;
+   for (const rank of RANKS) {
+      const totalRequirements = Object.values(rank.requirements).reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0);
+      if (completedHabits >= totalRequirements) {
+        rankName = rank.name;
+      }
+    }
+
+  const publicProfile: PublicProfile = {
+    uid,
+    displayName: name,
+    photoURL: `https://i.pravatar.cc/150?u=${uid}`,
+    rankName,
+    completedHabits,
+  };
+  const publicProfileRef = doc(db, PUBLIC_PROFILES_COLLECTION, uid);
+  batch.set(publicProfileRef, publicProfile);
+  
+  await batch.commit();
+}

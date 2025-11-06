@@ -2,28 +2,34 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
-import { getAllUsers, updateUserRole, deleteHabitForUser, seedLeaderboardData } from '@/lib/firestore-service';
-import { FirestoreUser, FirestoreHabit, PublicProfile } from '@/lib/types';
+import { getAllUsers, updateUserRole, deleteHabitForUser, seedUsersAndProfiles, createFakeUser } from '@/lib/firestore-service';
+import { FirestoreUser, FirestoreHabit } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Users, ShieldCheck, BarChart4, Trash2, Eye, TestTube2 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Loader2, Users, ShieldCheck, BarChart4, Trash2, Eye, TestTube2, PlusCircle, UserPlus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
+
+const fakeUserSchema = z.object({
+  name: z.string().min(3, 'El nombre debe tener al menos 3 caracteres.'),
+  completedHabits: z.coerce.number().min(0).max(100),
+  hasActiveHabits: z.boolean(),
+  streakDays: z.coerce.number().min(0).max(365),
+});
 
 export default function AdminPage() {
   const { user, userDoc, loading: authLoading } = useAuth();
@@ -39,27 +45,35 @@ export default function AdminPage() {
   
   const isUserAdmin = useMemo(() => userDoc?.data()?.role === 'admin', [userDoc]);
 
+  const form = useForm<z.infer<typeof fakeUserSchema>>({
+    resolver: zodResolver(fakeUserSchema),
+    defaultValues: {
+      name: '',
+      completedHabits: 0,
+      hasActiveHabits: true,
+      streakDays: 3,
+    },
+  });
+
+  const fetchAllUsers = async () => {
+      try {
+        const users = await getAllUsers();
+        setAllUsers(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios.' });
+      }
+    };
+
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
         router.push('/login');
       } else if (userDoc && !isUserAdmin) {
-        router.push('/home'); // Redirect non-admins
+        router.push('/home');
       } else if(userDoc && isUserAdmin) {
-        // Fetch admin data
-        const fetchAllUsers = async () => {
-          setLoading(true);
-          try {
-            const users = await getAllUsers();
-            setAllUsers(users);
-          } catch (error) {
-            console.error("Error fetching users:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los usuarios.' });
-          } finally {
-            setLoading(false);
-          }
-        };
-        fetchAllUsers();
+        setLoading(true);
+        fetchAllUsers().finally(() => setLoading(false));
       }
     }
   }, [authLoading, user, isUserAdmin, userDoc, router, toast]);
@@ -82,44 +96,54 @@ export default function AdminPage() {
 
   const handleDeleteHabit = async (habitId: string) => {
     if (!selectedUser) return;
-    
     try {
         await deleteHabitForUser(selectedUser.uid, habitId);
-        
-        // Update local state to reflect deletion
         const updatedUserHabits = selectedUser.habits.filter(h => h.id !== habitId);
-        const updatedUser = {
-            ...selectedUser,
-            habits: updatedUserHabits
-        };
+        const updatedUser = { ...selectedUser, habits: updatedUserHabits };
         setSelectedUser(updatedUser);
         setAllUsers(prevUsers => prevUsers.map(u => u.uid === selectedUser.uid ? updatedUser : u));
-
         toast({ title: 'Éxito', description: 'El reto ha sido eliminado.' });
     } catch (error) {
         console.error("Error deleting habit:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el reto.' });
     }
   };
-
-  const handleSeedLeaderboard = async () => {
+  
+  const handleSeedData = async () => {
     setSeeding(true);
     try {
-      await seedLeaderboardData();
-      toast({ title: 'Éxito', description: 'Se han generado 100 usuarios ficticios en el ranking.' });
+      await seedUsersAndProfiles(50);
+      await fetchAllUsers(); // Refresh user list
+      toast({ title: 'Éxito', description: 'Se han generado 50 usuarios ficticios.' });
     } catch (error) {
-      console.error("Error seeding leaderboard:", error);
+      console.error("Error seeding data:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron generar los datos de prueba.' });
     } finally {
       setSeeding(false);
     }
-  }
+  };
+
+  const handleCreateFakeUser = async (values: z.infer<typeof fakeUserSchema>) => {
+      setSeeding(true);
+      try {
+          await createFakeUser(values);
+          await fetchAllUsers();
+          toast({ title: 'Éxito', description: `Usuario "${values.name}" creado.`});
+          form.reset();
+          // Keep dialog open for more creation? For now, we close it.
+      } catch (error) {
+          console.error("Error creating fake user:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear el usuario.' });
+      } finally {
+          setSeeding(false);
+      }
+  };
 
   const filteredUsers = useMemo(() => {
     if (!searchTerm) return allUsers;
     return allUsers.filter(u => 
-        u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        (u.displayName && u.displayName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [allUsers, searchTerm]);
   
@@ -132,10 +156,8 @@ export default function AdminPage() {
   }
   
   if (!isUserAdmin) {
-    // This is a fallback for the brief moment before redirection
      return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
-
 
   return (
     <div className="space-y-8">
@@ -152,17 +174,15 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{allUsers.length}</div>
-              <p className="text-xs text-muted-foreground">Usuarios registrados en la plataforma.</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Retos</CardTitle>
+              <CardTitle className="text-sm font-medium">Total de Retos Activos</CardTitle>
               <BarChart4 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalHabits}</div>
-              <p className="text-xs text-muted-foreground">Retos activos creados por los usuarios.</p>
             </CardContent>
           </Card>
           <Card>
@@ -172,34 +192,72 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{allUsers.filter(u => u.role === 'admin').length}</div>
-              <p className="text-xs text-muted-foreground">Usuarios con permisos de administrador.</p>
             </CardContent>
           </Card>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Herramientas de Administrador</CardTitle>
+            <CardTitle>Herramientas de Simulación</CardTitle>
+            <CardDescription>Crea datos de prueba para verificar el funcionamiento de la aplicación.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-4">
+              <Dialog>
+                <DialogTrigger asChild>
+                    <Button><UserPlus className="mr-2 h-4 w-4" />Crear Usuario Ficticio</Button>
+                </DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Crear Usuario Ficticio</DialogTitle>
+                        <DialogDescription>Genera un nuevo usuario con datos de prueba personalizables.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleCreateFakeUser)} className="space-y-4">
+                            <FormField control={form.control} name="name" render={({ field }) => (
+                                <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input placeholder="Ej: Usuario de Prueba" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={form.control} name="completedHabits" render={({ field }) => (
+                                <FormItem><FormLabel>Retos Completados (para Rango)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={form.control} name="hasActiveHabits" render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                                    <div className="space-y-1 leading-none"><FormLabel>¿Añadir reto activo con racha?</FormLabel></div>
+                                </FormItem>
+                            )}/>
+                            {form.watch('hasActiveHabits') && (
+                               <FormField control={form.control} name="streakDays" render={({ field }) => (
+                                    <FormItem><FormLabel>Días de Racha</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                                )}/>
+                            )}
+                            <DialogFooter>
+                                <Button type="submit" disabled={seeding}>
+                                    {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                                    Crear Usuario
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+              </Dialog>
+
               <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button disabled={seeding}>
+                    <Button variant="secondary" disabled={seeding}>
                       {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TestTube2 className="mr-2 h-4 w-4" />}
-                       Poblar Ranking (Test)
+                       Poblar Base de Datos (50)
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                       <AlertDialogHeader>
-                          <AlertDialogTitle>¿Poblar el ranking con datos de prueba?</AlertDialogTitle>
+                          <AlertDialogTitle>¿Generar 50 usuarios de prueba?</AlertDialogTitle>
                           <AlertDialogDescription>
-                              Esta acción creará 100 usuarios ficticios en el ranking de la comunidad.
-                              Esto no afectará a los usuarios reales. Es útil para probar la funcionalidad del ranking.
+                              Esta acción creará 50 usuarios ficticios con sus perfiles públicos. Es útil para probar el ranking y la carga general de usuarios.
                           </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleSeedLeaderboard}>
+                          <AlertDialogAction onClick={handleSeedData}>
                               Sí, poblar datos
                           </AlertDialogAction>
                       </AlertDialogFooter>
@@ -220,7 +278,7 @@ export default function AdminPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="overflow-x-auto">
+                <ScrollArea className="h-96">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -235,15 +293,14 @@ export default function AdminPage() {
                             {filteredUsers.map((u) => (
                             <TableRow key={u.uid}>
                                 <TableCell className="font-medium">{u.displayName}</TableCell>
-                                <TableCell>{u.email}</TableCell>
+                                <TableCell className="text-muted-foreground">{u.email}</TableCell>
                                 <TableCell>{u.habits?.length || 0}</TableCell>
                                 <TableCell>
                                     <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>{u.role}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right flex items-center justify-end gap-2">
-                                     <Button variant="outline" size="sm" onClick={() => handleOpenUserHabits(u)}>
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        Ver Retos
+                                     <Button variant="outline" size="sm" onClick={() => handleOpenUserHabits(u)} disabled={!u.habits || u.habits.length === 0}>
+                                        <Eye className="h-4 w-4" />
                                     </Button>
                                     <Select onValueChange={(newRole: 'user' | 'admin') => handleRoleChange(u.uid, newRole)} defaultValue={u.role}>
                                         <SelectTrigger className="w-[120px]">
@@ -259,7 +316,7 @@ export default function AdminPage() {
                             ))}
                         </TableBody>
                     </Table>
-                </div>
+                </ScrollArea>
             </CardContent>
        </Card>
 
@@ -320,5 +377,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
