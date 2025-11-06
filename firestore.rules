@@ -26,7 +26,7 @@ service cloud.firestore {
 
       // Un usuario autenticado puede crear su propio documento.
       // Un administrador puede crear cualquier documento de usuario.
-      allow create: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null;
     }
 
     // Regla para permitir a los administradores leer la lista completa de usuarios.

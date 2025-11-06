@@ -15,7 +15,7 @@ const USERS_COLLECTION = 'users';
  */
 export async function updatePublicProfile(userId: string, profileData: PublicProfile): Promise<void> {
   const publicProfileRef = doc(db, PUBLIC_PROFILES_COLLECTION, userId);
-  await setDoc(publicProfileRef, profileData);
+  await setDoc(publicProfileRef, profileData, { merge: true });
 }
 
 /**
@@ -161,7 +161,6 @@ export async function createFakeUser({
           date: format(subDays(new Date(), i), 'yyyy-MM-dd'),
           completed: true,
           journal: `Entrada del día de racha #${streakDays - i}`,
-          isExtra: false,
         });
       }
     }
