@@ -84,7 +84,7 @@ export async function deleteHabitForUser(uid: string, habitId: string): Promise<
  * [ADMIN] Generates a specified number of fake users and their public profiles for testing.
  * @param count The number of fake users to create.
  */
-export async function seedUsersAndProfiles(count: number = 100): Promise<void> {
+export async function seedUsersAndProfiles(count: number = 50): Promise<void> {
   const batch = writeBatch(db);
   const names = ['Alex', 'Jordan', 'Taylor', 'Casey', 'Riley', 'Jamie', 'Morgan', 'Skyler', 'Peyton', 'Quinn'];
 

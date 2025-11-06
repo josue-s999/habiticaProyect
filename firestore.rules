@@ -2,10 +2,35 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Los usuarios solo pueden leer y escribir en su propio documento en la colección 'users'.
+    
+    // Función para verificar si un usuario es administrador.
+    function isAdmin() {
+      // Obtiene el documento del usuario que hace la petición y verifica su rol.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     match /users/{userId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Un usuario puede leer su propio documento.
+      // Un administrador puede leer cualquier documento de usuario.
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      
+      // Un usuario puede actualizar su propio documento.
+      // Un administrador puede actualizar el rol de cualquier usuario.
+      allow update: if request.auth != null && (
+                    request.auth.uid == userId ||
+                    (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']))
+                  );
+                  
+      // Un usuario puede eliminar su propio documento.
+      allow delete: if request.auth != null && request.auth.uid == userId;
+
+      // Un usuario autenticado puede crear su propio documento.
       allow create: if request.auth != null;
+    }
+
+    // Regla para permitir a los administradores leer la lista completa de usuarios.
+    match /users/{document=**} {
+      allow list: if request.auth != null && isAdmin();
     }
 
     // El ranking es público, cualquiera puede leerlo.
