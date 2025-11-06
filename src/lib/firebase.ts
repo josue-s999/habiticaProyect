@@ -5,16 +5,25 @@ import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// =================================================================
+// ¡IMPORTANTE! INSERTA TU PROPIA CONFIGURACIÓN DE FIREBASE AQUÍ
+// =================================================================
+// 1. Ve a la consola de Firebase: https://console.firebase.google.com/
+// 2. Crea un nuevo proyecto (o selecciona uno existente).
+// 3. En la configuración de tu proyecto (icono de engranaje), ve a "Configuración del proyecto".
+// 4. En la pestaña "General", desplázate hacia abajo hasta "Tus apps".
+// 5. Selecciona o crea una aplicación web.
+// 6. Elige la opción "CDN" para ver el objeto de configuración.
+// 7. Copia los valores y pégalos aquí abajo.
+// =================================================================
 const firebaseConfig = {
-  apiKey: "AIzaSyA-7273k99dvhkPIRMwLfbHWasJ6TThL3I",
-  authDomain: "administracionmaestra.firebaseapp.com",
-  projectId: "administracionmaestra",
-  storageBucket: "administracionmaestra.firebasestorage.app",
-  messagingSenderId: "836762043895",
-  appId: "1:836762043895:web:aea541e46de9bc17b69af2",
-  measurementId: "G-VZ6QK0FHFS"
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_AUTH_DOMAIN",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_STORAGE_BUCKET",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID",
+  measurementId: "TU_MEASUREMENT_ID" // Opcional
 };
 
 // Initialize Firebase
@@ -25,8 +34,9 @@ const db = getFirestore(app);
 // Connect to emulators if running in a development environment
 if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
   console.log("Connecting to Firebase Emulators");
-  connectAuthEmulator(auth, "http://localhost:9099");
-  connectFirestoreEmulator(db, 'localhost', 8080);
+  // Descomenta las siguientes líneas si quieres usar los emuladores locales
+  // connectAuthEmulator(auth, "http://localhost:9099");
+  // connectFirestoreEmulator(db, 'localhost', 8080);
 }
 
 
