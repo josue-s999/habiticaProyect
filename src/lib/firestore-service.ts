@@ -96,10 +96,10 @@ export async function seedUsersAndProfiles(count: number = 50): Promise<void> {
     // Determine rank
     let rankName = RANKS[0].name;
     for (const rank of RANKS) {
-      const totalRequirements = Object.values(rank.requirements).reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0);
-      if (completedHabitsCount >= totalRequirements) {
-        rankName = rank.name;
-      }
+        const totalRequirements = Object.values(rank.requirements).reduce((sum, count) => sum + count, 0);
+        if (completedHabitsCount >= totalRequirements) {
+            rankName = rank.name;
+        }
     }
     
     // Create Firestore User
@@ -171,7 +171,7 @@ export async function createFakeUser({
       category: 'Crecimiento Personal',
       description: 'Reto de prueba generado por admin.',
       duration: 30,
-      entries: entries,
+      entries: entries.reverse(), // Ensure entries are in chronological order
     });
   }
 
@@ -190,12 +190,12 @@ export async function createFakeUser({
   batch.set(userDocRef, fakeUser);
 
   // --- 2. Create Public Profile ---
-  let rankName = RANKS[0].name;
-   for (const rank of RANKS) {
-      const totalRequirements = Object.values(rank.requirements).reduce((sum, val) => sum + (typeof val === 'number' ? val : 0), 0);
-      if (completedHabits >= totalRequirements) {
-        rankName = rank.name;
-      }
+    let rankName = RANKS[0].name;
+    for (const rank of RANKS) {
+        const totalRequirements = Object.values(rank.requirements).reduce((sum, count) => sum + count, 0);
+        if (completedHabits >= totalRequirements) {
+            rankName = rank.name;
+        }
     }
 
   const publicProfile: PublicProfile = {
