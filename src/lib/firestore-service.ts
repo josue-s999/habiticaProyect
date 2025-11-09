@@ -4,6 +4,8 @@ import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, limit, upd
 import type { PublicProfile, FirestoreUser, FirestoreHabit, HabitEntry } from '@/lib/types';
 import { RANKS } from './constants';
 import { addDays, format, subDays } from 'date-fns';
+import { errorEmitter } from './error-emitter';
+import { FirestorePermissionError } from './errors';
 
 const PUBLIC_PROFILES_COLLECTION = 'publicProfiles';
 const USERS_COLLECTION = 'users';
@@ -48,8 +50,21 @@ export async function getLeaderboardUsers(): Promise<PublicProfile[]> {
  * @returns A promise that resolves to an array of all users.
  */
 export async function getAllUsers(): Promise<FirestoreUser[]> {
-    const querySnapshot = await getDocs(collection(db, USERS_COLLECTION));
-    return querySnapshot.docs.map(doc => doc.data() as FirestoreUser);
+    const usersCollRef = collection(db, USERS_COLLECTION);
+    try {
+        const querySnapshot = await getDocs(usersCollRef);
+        return querySnapshot.docs.map(doc => doc.data() as FirestoreUser);
+    } catch (serverError: any) {
+        if (serverError.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: usersCollRef.path,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+        // Re-throw other errors
+        throw serverError;
+    }
 }
 
 /**
@@ -59,7 +74,16 @@ export async function getAllUsers(): Promise<FirestoreUser[]> {
  */
 export async function updateUserRole(uid: string, newRole: 'user' | 'admin'): Promise<void> {
     const userRef = doc(db, USERS_COLLECTION, uid);
-    await updateDoc(userRef, { role: newRole });
+    updateDoc(userRef, { role: newRole }).catch(serverError => {
+        if (serverError.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'update',
+                requestResourceData: { role: newRole }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    });
 }
 
 /**
@@ -77,7 +101,17 @@ export async function deleteHabitForUser(uid: string, habitId: string): Promise<
 
     const userData = userDocSnap.data() as FirestoreUser;
     const updatedHabits = userData.habits.filter((habit: FirestoreHabit) => habit.id !== habitId);
-    await updateDoc(userRef, { habits: updatedHabits });
+    
+    updateDoc(userRef, { habits: updatedHabits }).catch(serverError => {
+        if (serverError.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'update',
+                requestResourceData: { habits: updatedHabits }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    });
 }
 
 /**
@@ -129,7 +163,15 @@ export async function seedUsersAndProfiles(count: number = 50): Promise<void> {
     batch.set(publicProfileRef, publicProfile);
   }
 
-  await batch.commit();
+  batch.commit().catch(serverError => {
+       if (serverError.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: `batch write to ${USERS_COLLECTION} and ${PUBLIC_PROFILES_COLLECTION}`,
+                operation: 'create',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+       }
+  });
 }
 
 
@@ -207,5 +249,14 @@ export async function createFakeUser({
   const publicProfileRef = doc(db, PUBLIC_PROFILES_COLLECTION, uid);
   batch.set(publicProfileRef, publicProfile);
   
-  await batch.commit();
+  batch.commit().catch(serverError => {
+       if (serverError.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: `batch write with user and public profile`,
+                operation: 'create',
+                requestResourceData: { user: fakeUser, publicProfile: publicProfile }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+       }
+  });
 }

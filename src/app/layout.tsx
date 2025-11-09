@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from '@/hooks/use-auth';
 import { useThemeObserver } from '@/hooks/useThemeObserver';
 import { Inter } from 'next/font/google';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -41,6 +42,7 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased`}>
         <AuthProvider>
           <ThemeObserver />
+          <FirebaseErrorListener />
           {children}
         </AuthProvider>
         <Toaster />
