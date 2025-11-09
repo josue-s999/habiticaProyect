@@ -37,7 +37,11 @@ Tú: "¡Gran meta! Aquí tienes un plan para lograrlo:" (Y aquí generas 1 o 2 s
 
 Historial de la conversación:
 {{#each history}}
-  {{this.role}}: {{{this.content}}}
+  {{#if (eq this.role 'user')}}
+    Usuario: {{{this.content}}}
+  {{else}}
+    Tú: {{{this.content}}}
+  {{/if}}
 {{/each}}
 
 Responde solo con el texto para el usuario. Sé breve y ve directo a las sugerencias de retos.
