@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Bell, BellOff, Loader2 } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
 import { Switch } from '@/components/ui/switch';
@@ -34,8 +34,8 @@ import {
 } from '@/lib/utils';
 import { RANKS } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
+import { setNotificationPreference } from '@/hooks/use-notifications';
  
-// --- Esquema de validación del formulario ---
 const profileFormSchema = z.object({
   username: z.string().min(2, {
     message: 'El nombre de usuario debe tener al menos 2 caracteres.',
@@ -46,33 +46,43 @@ const profileFormSchema = z.object({
 });
  
 export default function SettingsPage() {
-  const { user, updateUserProfile, deleteUserAccount } = useAuth();
+  const { user, userDoc, updateUserProfile, deleteUserAccount, updatePublicProfile, removePublicProfile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(
-    null
-  );
   const [isPublic, setIsPublic] = useState(false);
- 
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(false);
+  const isGoogleProvider = user?.providerData.some(p => p.providerId === 'google.com') ?? false;
+
+
   const form = useForm({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      username: user?.username || '',
-      email: user?.email || '',
+      username: '',
+      email: '',
     },
   });
- 
-  useEffect(() => {
-    if (user) {
-      setPublicProfile(user.publicProfile || null);
-      setIsPublic(user.publicProfile?.visible || false);
+
+   useEffect(() => {
+    if (userDoc) {
+      const userData = userDoc.data();
+      form.reset({
+        username: userData?.displayName || '',
+        email: userData?.email || '',
+      });
+      setIsPublic(userData?.isPublic || false);
     }
-  }, [user]);
+    // Set notification state from localStorage on mount
+    if (typeof window !== 'undefined') {
+        setNotificationsEnabled(localStorage.getItem('notificationsEnabled') === 'true');
+    }
+  }, [userDoc, form]);
  
-  const onSubmit = async (values: any) => {
+  const onSubmit = async (values: z.infer<typeof profileFormSchema>) => {
     setLoading(true);
     try {
-      await updateUserProfile(values);
+      if (values.username !== userDoc?.data()?.displayName) {
+          await updateUserProfile(values.username);
+      }
       toast({
         title: 'Perfil actualizado',
         description: 'Tu información se guardó correctamente.',
@@ -88,41 +98,84 @@ export default function SettingsPage() {
     }
   };
  
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = async (password?: string) => {
     try {
-      await deleteUserAccount();
-      toast({
-        title: 'Cuenta eliminada',
-        description: 'Tu cuenta ha sido eliminada permanentemente.',
-      });
-    } catch (error) {
+      await deleteUserAccount(password);
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error al eliminar la cuenta',
-        description: 'Hubo un problema al eliminar tu cuenta.',
+        description: error.message || 'Hubo un problema al eliminar tu cuenta.',
       });
     }
   };
- 
-  const rank = useMemo(() => {
-    const completed = publicProfile?.stats?.completedHabits || 0;
-    const rankKeys = Object.keys(RANKS);
-    for (let i = rankKeys.length - 1; i >= 0; i--) {
-      const key = rankKeys[i];
-      if (completed >= RANKS[key].min) return key;
+
+  const handlePublicProfileToggle = async (isToggled: boolean) => {
+    if (!userDoc?.exists()) return;
+    setIsPublic(isToggled);
+    
+    const userData = userDoc.data();
+    const userHabits: Habit[] = (userData?.habits || []).map((h: FirestoreHabit) => ({
+      ...h,
+      icon: getIconForHabit(h.id),
+      entries: h.entries || [],
+    }));
+    const completedHabitsByCategory = calculateCompletedHabitsByCategory(userHabits);
+
+    let currentRankName = RANKS[0].name;
+    for (let i = RANKS.length - 1; i >= 0; i--) {
+        const rank = RANKS[i];
+        const requirementsMet = Object.entries(rank.requirements).every(([category, requiredCount]) => {
+            return (completedHabitsByCategory[category] || 0) >= requiredCount;
+        });
+        if (requirementsMet) {
+            currentRankName = rank.name;
+            break;
+        }
     }
-    return 'beginner';
-  }, [publicProfile]);
+
+    try {
+        if (isToggled) {
+            const profile: PublicProfile = {
+                uid: userDoc.id,
+                displayName: userData?.displayName,
+                photoURL: user?.photoURL ?? `https://i.pravatar.cc/150?u=${userDoc.id}`,
+                completedHabits: completedHabitsByCategory.total,
+                rankName: currentRankName,
+            };
+            await updatePublicProfile(profile);
+            toast({ title: 'Perfil Público Activado', description: 'Ahora aparecerás en el ranking.' });
+        } else {
+            await removePublicProfile();
+            toast({ title: 'Perfil Público Desactivado', description: 'Ya no serás visible en el ranking.' });
+        }
+    } catch (error) {
+        setIsPublic(!isToggled);
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la visibilidad del perfil.' });
+    }
+  };
+
+  const handleNotificationToggle = async (enable: boolean) => {
+    const success = await setNotificationPreference(enable);
+    setNotificationsEnabled(enable && success);
+    if (enable && success) {
+        toast({ title: 'Notificaciones Activadas', description: 'Recibirás recordatorios para tus retos.'});
+    } else if (enable && !success) {
+        toast({ variant: 'destructive', title: 'Permiso Denegado', description: 'No se pudieron activar las notificaciones.'});
+    } else {
+        toast({ title: 'Notificaciones Desactivadas'});
+    }
+  };
  
   return (
-<div className="container mx-auto py-10">
+<div className="container mx-auto py-10 max-w-4xl">
 <div className="grid gap-6 md:grid-cols-2">
         {/* ---- CARD PERFIL ---- */}
 <Card>
 <CardHeader>
-<CardTitle>Perfil</CardTitle>
+<CardTitle>Perfil de Usuario</CardTitle>
 <CardDescription>
-              Actualiza tu información de usuario.
+              Actualiza tu nombre de usuario visible.
 </CardDescription>
 </CardHeader>
 <CardContent>
@@ -169,54 +222,59 @@ export default function SettingsPage() {
 </CardContent>
 </Card>
  
-        {/* ---- CARD PERFIL PÚBLICO ---- */}
-<Card>
-<CardHeader>
-<CardTitle>Perfil público</CardTitle>
-<CardDescription>
-              Configura la visibilidad de tu perfil.
-</CardDescription>
-</CardHeader>
-<CardContent className="space-y-6">
-<div className="flex items-center justify-between space-x-2">
-<Label htmlFor="isPublic">Hacer perfil público</Label>
-<Switch
-                id="isPublic"
-                checked={isPublic}
-                onCheckedChange={setIsPublic}
-              />
+        {/* ---- CARD CONFIGURACIÓN ---- */}
+<div className="space-y-6">
+    <Card>
+        <CardHeader>
+            <CardTitle>Configuración General</CardTitle>
+            <CardDescription>
+                Gestiona la configuración de tu cuenta.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+            <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                    <Label htmlFor="isPublic">Perfil Público</Label>
+                    <p className="text-xs text-muted-foreground">
+                        Permite que otros te vean en el ranking de la comunidad.
+                    </p>
+                </div>
+                <Switch
+                    id="isPublic"
+                    checked={isPublic}
+                    onCheckedChange={handlePublicProfileToggle}
+                />
+            </div>
+             <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                    <Label htmlFor="notifications">Notificaciones de Recordatorio</Label>
+                    <p className="text-xs text-muted-foreground">
+                       Recibe un recordatorio diario a las 7 PM si no has completado tus retos.
+                    </p>
+                </div>
+                 <Switch
+                    id="notifications"
+                    checked={notificationsEnabled}
+                    onCheckedChange={handleNotificationToggle}
+                />
+            </div>
+        </CardContent>
+    </Card>
+
+    <Card className="border-destructive">
+    <CardHeader>
+    <CardTitle className='text-destructive'>Zona de Peligro</CardTitle>
+    <CardDescription>
+                La siguiente acción no se puede deshacer.
+    </CardDescription>
+    </CardHeader>
+    <CardContent>
+        <DeleteAccountDialog onDeleteAccount={handleDeleteAccount} isGoogleProvider={isGoogleProvider} />
+    </CardContent>
+    </Card>
 </div>
-            {isPublic && publicProfile && (
-<div className="rounded-md border p-4">
-<p>
-<strong>Usuario:</strong> {form.getValues('username')}
-</p>
-<p>
-<strong>Rango:</strong> {RANKS[rank].label}
-</p>
-<p>
-<strong>Hábitos completados:</strong>{' '}
-                  {publicProfile.stats?.completedHabits || 0}
-</p>
-</div>
-            )}
-</CardContent>
-</Card>
- 
-        {/* ---- CARD ELIMINAR CUENTA ---- */}
-<Card className="md:col-span-2">
-<CardHeader>
-<CardTitle>Eliminar cuenta</CardTitle>
-<CardDescription>
-              Esta acción no se puede deshacer. Toda tu información será
-              eliminada.
-</CardDescription>
-</CardHeader>
-<CardFooter>
-<DeleteAccountDialog onConfirm={handleDeleteAccount} />
-</CardFooter>
-</Card>
+
 </div>
 </div>
   );
-} // ✅ ← ESTA llave cierra correctamente la función SettingsPage
+}

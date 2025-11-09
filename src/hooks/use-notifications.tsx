@@ -9,54 +9,14 @@ import { isSameDay, parseISO } from 'date-fns';
 // Store timeout IDs to prevent scheduling multiple notifications
 const notificationTimeouts = new Map<string, NodeJS.Timeout>();
 
-export function useNotifications() {
-  const { userDoc, loading } = useAuth();
-
-  useEffect(() => {
-    // Run only on client, when auth is loaded, and user is logged in
-    if (typeof window === 'undefined' || loading || !userDoc) {
-      return;
-    }
-    
-    const notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
-    if (!notificationsEnabled) {
-      return;
-    }
-
-    if (!('Notification' in window)) {
-      console.error('Este navegador no soporta notificaciones de escritorio.');
-      return;
-    }
-
-    const habits: Habit[] = userDoc.data()?.habits || [];
-
-    const requestPermissionAndSchedule = () => {
-      if (Notification.permission === 'granted') {
-        scheduleDailyReminders(habits);
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then((permission) => {
-          if (permission === 'granted') {
-            localStorage.setItem('notificationsEnabled', 'true');
-            scheduleDailyReminders(habits);
-          } else {
-             localStorage.setItem('notificationsEnabled', 'false');
-          }
-        });
-      }
-    };
-
-    requestPermissionAndSchedule();
-
-    // Cleanup function to clear timeouts when component unmounts or user changes
-    return () => {
-      notificationTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-      notificationTimeouts.clear();
-    };
-
-  }, [userDoc, loading]);
-}
-
+/**
+ * Schedules daily reminders for all active habits that haven't been completed today.
+ * @param habits The user's list of habits.
+ */
 function scheduleDailyReminders(habits: Habit[]) {
+  // Clear any previously scheduled reminders to avoid duplicates
+  clearAllReminders();
+
   const now = new Date();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -82,20 +42,100 @@ function scheduleDailyReminders(habits: Habit[]) {
 
     const delay = reminderTime.getTime() - now.getTime();
 
-    // Clear any existing timeout for this habit to avoid duplicates
-    if (notificationTimeouts.has(habit.id)) {
-      clearTimeout(notificationTimeouts.get(habit.id));
-    }
-
     const timeoutId = setTimeout(() => {
-      new Notification('¡No te olvides de tu hábito!', {
-        body: `Aún no has completado tu reto de hoy: "${habit.name}". ¡Tú puedes!`,
-        icon: '/logo.png', // You should add a logo.png to your public folder
-        tag: `habit-reminder-${habit.id}`, // Tag to prevent multiple notifications for the same habit
+      new Notification('¡No te olvides de tu reto!', {
+        body: `Aún no has completado: "${habit.name}". ¡Tú puedes!`,
+        icon: '/logo.png', // Ensure you have a logo.png in your /public folder
+        tag: `habit-reminder-${habit.id}`,
       });
       notificationTimeouts.delete(habit.id); // Clean up after showing
     }, delay);
 
     notificationTimeouts.set(habit.id, timeoutId);
   });
+}
+
+/**
+ * Clears all scheduled notification timeouts.
+ */
+function clearAllReminders() {
+  notificationTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+  notificationTimeouts.clear();
+}
+
+
+/**
+ * Main hook to manage notification logic based on user settings.
+ */
+export function useNotifications() {
+  const { userDoc, loading } = useAuth();
+
+  useEffect(() => {
+    // This effect should only run on the client side
+    if (typeof window === 'undefined' || loading || !userDoc) {
+      return;
+    }
+    
+    // Listen for changes in localStorage to enable/disable notifications
+    const handleStorageChange = () => {
+        const notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
+        const habits: Habit[] = userDoc.data()?.habits || [];
+
+        if (notificationsEnabled && Notification.permission === 'granted') {
+            scheduleDailyReminders(habits);
+        } else {
+            clearAllReminders();
+        }
+    };
+    
+    // Initial setup
+    handleStorageChange();
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearAllReminders();
+    };
+
+  }, [userDoc, loading]);
+}
+
+/**
+ * A helper function to request notification permission and update settings.
+ * This should be called from a user interaction (e.g., a button click).
+ * @param enable - Whether to enable or disable notifications.
+ */
+export async function setNotificationPreference(enable: boolean): Promise<boolean> {
+  if (enable) {
+    if (!('Notification' in window)) {
+      alert('Este navegador no soporta notificaciones de escritorio.');
+      return false;
+    }
+
+    if (Notification.permission === 'granted') {
+      localStorage.setItem('notificationsEnabled', 'true');
+      window.dispatchEvent(new Event('storage')); // Trigger update
+      return true;
+    }
+
+    if (Notification.permission !== 'denied') {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        localStorage.setItem('notificationsEnabled', 'true');
+        window.dispatchEvent(new Event('storage')); // Trigger update
+        return true;
+      }
+    }
+    // If permission is denied or dismissed, reflect that.
+    localStorage.setItem('notificationsEnabled', 'false');
+    window.dispatchEvent(new Event('storage'));
+    return false;
+  } else {
+    // User is disabling notifications
+    localStorage.setItem('notificationsEnabled', 'false');
+    window.dispatchEvent(new Event('storage')); // Trigger update to clear reminders
+    return true;
+  }
 }
