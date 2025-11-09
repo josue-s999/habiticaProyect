@@ -35,11 +35,11 @@ const navItems = [
     { href: '/achievements', label: 'Logros', icon: Award },
     { href: '/leaderboard', label: 'Ranking', icon: Users },
     { href: '/reports', label: 'Reportes', icon: BarChart },
-    { href: '/mockups', label: 'Mockups', icon: Image },
 ];
 
 const adminNavItems = [
     { href: '/admin', label: 'Admin', icon: ShieldCheck },
+    { href: '/mockups', label: 'Mockups', icon: Image },
 ]
 
 const bottomNavItems = [

@@ -1,13 +1,17 @@
 
 'use client';
 
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo } from 'react';
+import { Loader2 } from 'lucide-react';
 import { AIChatPanel } from "@/components/AIChatPanel";
 import { HabitProgress } from "@/components/HabitProgress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RANKS } from "@/lib/constants";
 import { ChatMessage, Habit } from "@/lib/types";
-import { CheckCircle, Dumbbell, Sparkles, Star, Trophy } from "lucide-react";
+import { CheckCircle, Dumbbell, Star } from "lucide-react";
 import { useState } from "react";
 
 const mockHabit: Habit = {
@@ -38,7 +42,17 @@ const mockChatHistory: ChatMessage[] = [
 ];
 
 export default function MockupsPage() {
+    const { userDoc, loading: authLoading } = useAuth();
+    const router = useRouter();
     const [habit, setHabit] = useState(mockHabit);
+
+    const isUserAdmin = useMemo(() => userDoc?.data()?.role === 'admin', [userDoc]);
+
+    useEffect(() => {
+        if (!authLoading && !isUserAdmin) {
+            router.push('/home');
+        }
+    }, [authLoading, isUserAdmin, router]);
 
     const handleUpdateEntry = (habitId: string, entryDate: string, newValues: Partial<any>) => {
         setHabit(prev => ({
@@ -46,6 +60,10 @@ export default function MockupsPage() {
             entries: prev.entries.map(e => e.date === entryDate ? { ...e, ...newValues } : e)
         }));
     };
+
+    if (authLoading || !isUserAdmin) {
+        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+    }
     
     return (
         <div className="space-y-8">
